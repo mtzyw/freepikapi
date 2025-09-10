@@ -127,7 +127,33 @@ export async function r2UploadFromUrl(url: string, key: string): Promise<{
     throw new Error(`download_failed ${_res.status}`);
   }
   const res = _res as Response;
-  const contentType = res.headers.get("content-type");
+  // 依据文件扩展名兜底/纠正 Content-Type（上游有时会返回错误的 jpeg）
+  const ext = (() => {
+    const m = key.toLowerCase().match(/\.([a-z0-9]+)$/);
+    return m ? m[1] : null;
+  })();
+  const headerCt = (res.headers.get("content-type") || "").split(";")[0].trim() || null;
+  const mimeFromExt = (() => {
+    switch (ext) {
+      case "png": return "image/png";
+      case "jpg":
+      case "jpeg": return "image/jpeg";
+      case "webp": return "image/webp";
+      case "gif": return "image/gif";
+      case "bmp": return "image/bmp";
+      case "svg": return "image/svg+xml";
+      case "mp4": return "video/mp4";
+      case "mov": return "video/quicktime";
+      case "webm": return "video/webm";
+      case "json": return "application/json";
+      default: return null;
+    }
+  })();
+  const contentType = (() => {
+    if (mimeFromExt && !headerCt) return mimeFromExt;
+    if (mimeFromExt && headerCt && headerCt !== mimeFromExt) return mimeFromExt;
+    return headerCt || undefined;
+  })() as string | undefined;
   const body = toNodeReadable(res.body);
   const out = await withUploadPermit(() => r2UploadStream({ key, body, contentType: contentType || undefined } as any));
   const size = Number(res.headers.get("content-length")) || null;
