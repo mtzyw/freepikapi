@@ -45,11 +45,13 @@ export async function POST(req: NextRequest) {
   if (task.status !== "PENDING") return NextResponse.json({ ok: true, skipped: true });
 
   logger.info("提交上游开始", { taskId: task.id, model: task.model, type: task.type });
+  let chosenApiKeyId: string | null = task.api_key_id ?? null;
   let apiKey = task.api_key_id ? await repoGetApiKeyCipherById(task.api_key_id) : null;
   if (!apiKey) {
     const pick = await repoSelectApiKey();
-    if (!pick?.apiKeyCipher) return NextResponse.json({ error: "no_api_key_in_db" }, { status: 503 });
+    if (!pick?.apiKeyCipher || !pick?.apiKeyId) return NextResponse.json({ error: "no_api_key_in_db" }, { status: 503 });
     apiKey = pick.apiKeyCipher;
+    chosenApiKeyId = pick.apiKeyId;
   }
   logger.info("已选择API Key", { taskId: task.id, hasKey: Boolean(apiKey) });
 
@@ -88,6 +90,7 @@ export async function POST(req: NextRequest) {
       status: treatAsInProgress ? "IN_PROGRESS" : task.status,
       freepikTaskId: fpResp?.task_id,
       upstreamResp: fpResp,
+      apiKeyId: chosenApiKeyId || undefined as any,
     });
     logger.info("Freepik已受理", { taskId: task.id, freepik_task_id: fpResp?.task_id, status: fpResp?.status });
     // 固定策略：提交成功后，在2分钟时开始手动查询；之后每30秒查一次，直到5分钟

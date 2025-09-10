@@ -21,6 +21,8 @@ export const env = {
   R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
   R2_BUCKET: process.env.R2_BUCKET,
   R2_PUBLIC_BASE_URL: process.env.R2_PUBLIC_BASE_URL, // optional: e.g., https://cdn.example.com or https://<account>.r2.dev/<bucket>
+  R2_UPLOAD_PROGRESS_LOG: process.env.R2_UPLOAD_PROGRESS_LOG === "1" || process.env.R2_UPLOAD_PROGRESS_LOG === "true",
+  R2_UPLOAD_PART_SIZE_MB: Number(process.env.R2_UPLOAD_PART_SIZE_MB || 8),
   // Upstash QStash (optional for scheduled polling)
   QSTASH_CURRENT_SIGNING_KEY: process.env.QSTASH_CURRENT_SIGNING_KEY,
   QSTASH_NEXT_SIGNING_KEY: process.env.QSTASH_NEXT_SIGNING_KEY,

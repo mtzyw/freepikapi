@@ -88,6 +88,7 @@ export async function repoUpdateTask(id: string, patch: Partial<{
   resultUrls: string[];
   r2Objects: any[];
   error: string | null;
+  apiKeyId: string;
 }>): Promise<void> {
   const supabase = assertSupabase();
   const update: Record<string, any> = {};
@@ -98,6 +99,7 @@ export async function repoUpdateTask(id: string, patch: Partial<{
   if (patch.resultUrls) update.result_urls = patch.resultUrls;
   if (patch.r2Objects) update.r2_objects = patch.r2Objects;
   if (patch.error !== undefined) update.last_error = patch.error;
+  if (patch.apiKeyId) update.api_key_id = patch.apiKeyId;
   // Auto-manage timestamps for lifecycle transitions
   if (patch.status === "IN_PROGRESS") {
     update.started_at = new Date().toISOString();

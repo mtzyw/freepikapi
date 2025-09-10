@@ -65,7 +65,7 @@ export async function r2UploadStream(params: {
   partSizeBytes?: number;
 }) {
   const s3 = createR2Client();
-  const partSize = params.partSizeBytes ?? 8 * 1024 * 1024; // 8MB parts
+  const partSize = params.partSizeBytes ?? (env.R2_UPLOAD_PART_SIZE_MB * 1024 * 1024); // default from env, 8MB
   const uploader = new Upload({
     client: s3,
     params: {
@@ -78,6 +78,17 @@ export async function r2UploadStream(params: {
     partSize,
     leavePartsOnError: false,
   });
+  // Optional progress logging for large uploads
+  if (env.R2_UPLOAD_PROGRESS_LOG && (uploader as any)?.on) {
+    try {
+      (uploader as any).on("httpUploadProgress", (p: any) => {
+        const loaded = p?.loaded ?? 0;
+        const total = p?.total ?? null;
+        const part = p?.part ?? null;
+        logger.debug("r2.upload.progress", { key: params.key, loaded, total, part });
+      });
+    } catch {}
+  }
   logger.info("r2.upload.start", { bucket: env.R2_BUCKET, key: params.key, contentType: params.contentType, partSize });
   const result = await uploader.done().catch((e) => {
     logger.error("r2.upload.error", { bucket: env.R2_BUCKET, key: params.key, error: String(e?.message || e) });
