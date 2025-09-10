@@ -23,6 +23,18 @@ export const env = {
   R2_PUBLIC_BASE_URL: process.env.R2_PUBLIC_BASE_URL, // optional: e.g., https://cdn.example.com or https://<account>.r2.dev/<bucket>
   R2_UPLOAD_PROGRESS_LOG: process.env.R2_UPLOAD_PROGRESS_LOG === "1" || process.env.R2_UPLOAD_PROGRESS_LOG === "true",
   R2_UPLOAD_PART_SIZE_MB: Number(process.env.R2_UPLOAD_PART_SIZE_MB || 8),
+  R2_RECORD_ASSETS:
+    process.env.R2_RECORD_ASSETS === "1" ||
+    process.env.R2_RECORD_ASSETS === "true" ||
+    (!("R2_RECORD_ASSETS" in process.env) ? true : false),
+  // Proxy (transparent Freepik relay)
+  PROXY_WEBHOOK_MODE: (process.env.PROXY_WEBHOOK_MODE || 'inject_if_missing') as
+    | 'off'
+    | 'inject_if_missing'
+    | 'force_override',
+  PROXY_ALLOW_CALLBACK_HEADER:
+    process.env.PROXY_ALLOW_CALLBACK_HEADER === '1' ||
+    process.env.PROXY_ALLOW_CALLBACK_HEADER === 'true',
   // Upstash QStash (optional for scheduled polling)
   QSTASH_CURRENT_SIGNING_KEY: process.env.QSTASH_CURRENT_SIGNING_KEY,
   QSTASH_NEXT_SIGNING_KEY: process.env.QSTASH_NEXT_SIGNING_KEY,
@@ -39,6 +51,16 @@ export const env = {
   TASK_POLL_TIMEOUT_SECONDS: Number(process.env.TASK_POLL_TIMEOUT_SECONDS || 300),
   GLOBAL_POLL_MIN_FIRST_SECONDS: Number(process.env.GLOBAL_POLL_MIN_FIRST_SECONDS || 60),
   GLOBAL_POLL_TIMEOUT_SECONDS: Number(process.env.GLOBAL_POLL_TIMEOUT_SECONDS || 240),
+  // Stateless proxy mode (minimize DB writes)
+  PROXY_STATELESS: process.env.PROXY_STATELESS === "1" || process.env.PROXY_STATELESS === "true",
+  ENABLE_POLL: process.env.ENABLE_POLL === "1" || process.env.ENABLE_POLL === "true",
+  // Webhook HMAC secret (required in stateless mode)
+  WEBHOOK_TOKEN_SECRET: process.env.WEBHOOK_TOKEN_SECRET,
+  // Optional upstream Freepik API keys via env (comma-separated)
+  FREEPIK_API_KEYS: (process.env.FREEPIK_API_KEYS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0),
 };
 
 export function requireEnv(name: string): string {

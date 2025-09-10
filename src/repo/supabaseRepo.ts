@@ -247,3 +247,62 @@ export async function repoVerifyProxyKey(tokenCipher: string): Promise<{ id: str
   await (supabase as any).from("proxy_keys").update({ last_used_at: new Date().toISOString() }).eq("id", data.id);
   return { id: data.id };
 }
+
+export async function repoFindProxyKeyMetaByToken(tokenCipher: string): Promise<{
+  id: string;
+  active: boolean;
+  default_callback_url: string | null;
+  site_id: string | null;
+} | null> {
+  const supabase = assertSupabase();
+  const encoder = new TextEncoder();
+  let hashHex: string;
+  try {
+    const crypto = await import("node:crypto");
+    hashHex = crypto.createHash("sha256").update(tokenCipher).digest("hex");
+  } catch {
+    const bytes = encoder.encode(tokenCipher);
+    hashHex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  try {
+    const { data, error } = await (supabase as any)
+      .from("proxy_keys")
+      .select("id, active, default_callback_url, site_id")
+      .eq("token_hash", hashHex)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return data as any;
+  } catch (e) {
+    // Backward compatible: older DBs without default_callback_url/site_id
+    const { data, error } = await (supabase as any)
+      .from("proxy_keys")
+      .select("id, active")
+      .eq("token_hash", hashHex)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return { id: data.id, active: data.active, default_callback_url: null, site_id: null } as any;
+  }
+}
+
+export async function repoGetModelByRequestEndpoint(endpoint: string): Promise<
+  | {
+      name: string;
+      kind: string;
+      request_endpoint: string;
+      status_endpoint_template: string | null;
+      is_async: boolean;
+      supports_webhook: boolean;
+    }
+  | null
+> {
+  const supabase = assertSupabase();
+  const { data, error } = await (supabase as any)
+    .from("models")
+    .select("name, kind, request_endpoint, status_endpoint_template, is_async, supports_webhook")
+    .eq("request_endpoint", endpoint)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as any) ?? null;
+}

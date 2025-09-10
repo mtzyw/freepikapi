@@ -6,8 +6,7 @@ import { assertSupabase } from "@/lib/supabase";
 export async function storeResultsToR2(taskId: string, urls: string[]) {
   if (!urls || urls.length === 0) return [] as any[];
   if (!r2Enabled()) return [] as any[];
-
-  const supabase = assertSupabase();
+  const supabase = env.R2_RECORD_ASSETS ? assertSupabase() : null as any;
   const objects: any[] = [];
   let index = 0;
   for (const url of urls) {
@@ -44,7 +43,7 @@ export async function storeResultsToR2(taskId: string, urls: string[]) {
     }
   }
 
-  if (objects.length > 0) {
+  if (objects.length > 0 && env.R2_RECORD_ASSETS) {
     try {
       await (supabase as any).from("assets").insert(
         objects.map((o) => ({

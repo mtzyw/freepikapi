@@ -110,8 +110,28 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const modelName = full.model || "mystic";
-      const s = await getStatusForModel(modelName, fpTaskId, apiKey);
+      const modelName = full.model || null;
+      let s: { status?: string; generated?: string[] } | null = null;
+      if (modelName) {
+        s = await getStatusForModel(modelName, fpTaskId, apiKey);
+      } else {
+        s = null;
+      }
+      // Fallback: if model unknown or lookup failed, derive status endpoint from _proxy_entry
+      if (!s || !s.status) {
+        try {
+          const entry = (full as any)?.input_payload?._proxy_entry as string | undefined;
+          if (!entry) throw new Error('missing_proxy_entry');
+          const endpoint = `${env.FREEPIK_BASE_URL}${entry}/${fpTaskId}`;
+          const res = await fetch(endpoint, { headers: { "x-freepik-api-key": apiKey } });
+          if (!res.ok) throw new Error(`Freepik GET ${entry} failed: ${res.status}`);
+          const data = await res.json();
+          s = { status: data?.data?.status ?? data?.status, generated: data?.data?.generated ?? data?.generated };
+        } catch (e) {
+          // keep s as null; will go to retry branch below
+          s = s || { status: undefined, generated: undefined };
+        }
+      }
       if (s.status === "COMPLETED") {
         const urls = Array.isArray(s.generated) ? s.generated : undefined;
         logger.info("轮询获取到完成状态，进入终态处理", { taskId });
@@ -122,7 +142,7 @@ export async function POST(req: NextRequest) {
         await finalizeAndNotify({ task: { id: taskId, callback_url: basic?.callback_url ?? null, freepik_task_id: fpTaskId }, status: "FAILED", generated: [], resultPayload: { reason: "upstream_failed" } });
         return NextResponse.json({ ok: true, status: "FAILED" });
       }
-      // 仍在处理中 → 固定每30秒查询一次，直到 5 分钟
+      // 仍在处理中或无法获取状态 → 固定每30秒查询一次，直到 5 分钟
       const nextAttempt = attempt + 1;
       const nextElapsed = elapsedSec + 30;
       const delay = Math.max(1, Math.min(30, env.TASK_POLL_TIMEOUT_SECONDS - elapsedSec));
