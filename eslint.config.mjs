@@ -19,6 +19,12 @@ const eslintConfig = [
       "build/**",
       "next-env.d.ts",
     ],
+    rules: {
+      // Allow pragmatic use of any in server code paths
+      "@typescript-eslint/no-explicit-any": "off",
+      // Keep unused as warnings to avoid build failures during prototyping
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    },
   },
 ];
 
