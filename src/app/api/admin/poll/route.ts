@@ -10,14 +10,14 @@ export async function GET() {
   const inProgress = await repoListInProgressTasks();
   const results = [] as Array<{ id: string; status: string | undefined }>;
   for (const t of inProgress) {
-    // Time-based backoff: first status check >=60s after started_at; fail after 240s total
+    // Time-based backoff aligned with env: first check after GLOBAL_POLL_MIN_FIRST_SECONDS; timeout after GLOBAL_POLL_TIMEOUT_SECONDS
     const startTs = t.started_at ? Date.parse(t.started_at) : Date.parse(t.created_at);
     const elapsedSec = Math.max(0, Math.floor((Date.now() - startTs) / 1000));
-    if (elapsedSec < 60) {
+    if (elapsedSec < env.GLOBAL_POLL_MIN_FIRST_SECONDS) {
       // Skip early checks; give webhook a chance
       continue;
     }
-    if (elapsedSec >= 240) {
+    if (elapsedSec >= env.GLOBAL_POLL_TIMEOUT_SECONDS) {
       // Timeout -> mark failed and notify (load callback_url)
       const basic = (await repoGetTaskBasicById(t.id)) || { id: t.id, callback_url: null, freepik_task_id: t.freepik_task_id };
       await finalizeAndNotify({ task: basic, status: "FAILED", generated: [], resultPayload: { reason: "timeout", elapsed: elapsedSec } });

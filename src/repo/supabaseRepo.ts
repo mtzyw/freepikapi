@@ -1,6 +1,34 @@
 import { assertSupabase } from "@/lib/supabase";
 import { Task, TaskStatus, TaskType } from "@/lib/types";
 
+async function sha256Hex(input: string): Promise<string> {
+  // Prefer Node's crypto if available
+  try {
+    const nodeCrypto = await import("node:crypto");
+    if (typeof nodeCrypto.createHash === "function") {
+      return nodeCrypto.createHash("sha256").update(input).digest("hex");
+    }
+    // Node webcrypto
+    const subtle = (nodeCrypto as any)?.webcrypto?.subtle;
+    if (subtle) {
+      const buf = await subtle.digest("SHA-256", new TextEncoder().encode(input));
+      const bytes = new Uint8Array(buf as ArrayBuffer);
+      return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  } catch {}
+  // Edge/Browser runtime global webcrypto
+  try {
+    // @ts-ignore
+    const subtle = (globalThis.crypto && (globalThis.crypto as any).subtle) || null;
+    if (subtle) {
+      const buf = await subtle.digest("SHA-256", new TextEncoder().encode(input));
+      const bytes = new Uint8Array(buf as ArrayBuffer);
+      return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+  } catch {}
+  throw new Error("SHA-256 not available in this runtime");
+}
+
 function todayISODate() {
   const d = new Date();
   return d.toISOString().slice(0, 10);
@@ -225,17 +253,7 @@ export async function repoInsertInboundWebhook(input: {
 
 export async function repoVerifyProxyKey(tokenCipher: string): Promise<{ id: string } | null> {
   const supabase = assertSupabase();
-  const encoder = new TextEncoder();
-  // Node 18 lacks subtle crypto in some environments; fall back to node:crypto
-  let hashHex: string;
-  try {
-    const crypto = await import("node:crypto");
-    hashHex = crypto.createHash("sha256").update(tokenCipher).digest("hex");
-  } catch {
-    // Very unlikely, but keep a simple fallback
-    const bytes = encoder.encode(tokenCipher);
-    hashHex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
+  const hashHex = await sha256Hex(tokenCipher);
   const { data, error } = await (supabase as any)
     .from("proxy_keys")
     .select("id, active")
@@ -255,15 +273,7 @@ export async function repoFindProxyKeyMetaByToken(tokenCipher: string): Promise<
   site_id: string | null;
 } | null> {
   const supabase = assertSupabase();
-  const encoder = new TextEncoder();
-  let hashHex: string;
-  try {
-    const crypto = await import("node:crypto");
-    hashHex = crypto.createHash("sha256").update(tokenCipher).digest("hex");
-  } catch {
-    const bytes = encoder.encode(tokenCipher);
-    hashHex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
+  const hashHex = await sha256Hex(tokenCipher);
   try {
     const { data, error } = await (supabase as any)
       .from("proxy_keys")

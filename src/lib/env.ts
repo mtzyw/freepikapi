@@ -50,7 +50,7 @@ export const env = {
   POLL_MIN_FIRST_VIDEO_SECONDS: Number(process.env.POLL_MIN_FIRST_VIDEO_SECONDS || 120),
   TASK_POLL_TIMEOUT_SECONDS: Number(process.env.TASK_POLL_TIMEOUT_SECONDS || 300),
   GLOBAL_POLL_MIN_FIRST_SECONDS: Number(process.env.GLOBAL_POLL_MIN_FIRST_SECONDS || 60),
-  GLOBAL_POLL_TIMEOUT_SECONDS: Number(process.env.GLOBAL_POLL_TIMEOUT_SECONDS || 240),
+  GLOBAL_POLL_TIMEOUT_SECONDS: Number(process.env.GLOBAL_POLL_TIMEOUT_SECONDS || 300),
   // Stateless proxy mode (minimize DB writes)
   PROXY_STATELESS: process.env.PROXY_STATELESS === "1" || process.env.PROXY_STATELESS === "true",
   ENABLE_POLL: process.env.ENABLE_POLL === "1" || process.env.ENABLE_POLL === "true",

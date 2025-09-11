@@ -93,42 +93,63 @@ export async function POST(req: NextRequest) {
       apiKeyId: chosenApiKeyId || undefined as any,
     });
     logger.info("Freepik已受理", { taskId: task.id, freepik_task_id: fpResp?.task_id, status: fpResp?.status });
-    // 固定策略：提交成功后，在2分钟时开始手动查询；之后每30秒查一次，直到5分钟
-    if (redisAvailable()) {
-      try {
-        const ok = await redisSetNX(`qstash_lock:${task.id}`, `${Date.now()}`, 40 * 60 * 1000);
-        if (!ok) {
-          // Double-check value; if missing, degrade and still schedule to avoid lost polling when Redis is flaky
-          try {
-            const { redisGet } = await import("@/lib/redis");
-            const val = await redisGet(`qstash_lock:${task.id}`);
-            if (val) {
-              logger.debug("submit.qstash_lock.skip", { id: task.id });
-            } else {
+    // 固定策略：提交成功后，在2分钟时开始单任务轮询；确保全局兜底不受 Redis 影响
+    const canQstash = Boolean(env.QSTASH_TOKEN && env.NEXT_PUBLIC_SITE_URL);
+    let perTaskScheduled = false;
+    if (canQstash) {
+      if (redisAvailable()) {
+        try {
+          const ok = await redisSetNX(`qstash_lock:${task.id}`, `${Date.now()}`, 40 * 60 * 1000);
+          if (!ok) {
+            // Double-check value; if missing, degrade and still schedule to avoid lost polling when Redis is flaky
+            try {
+              const { redisGet } = await import("@/lib/redis");
+              const val = await redisGet(`qstash_lock:${task.id}`);
+              if (val) {
+                logger.debug("submit.qstash_lock.skip", { id: task.id });
+              } else {
+                const sched = await qstashScheduleTaskPoll({ taskId: task.id, attempt: 0, delaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS });
+                perTaskScheduled = Boolean((sched as any)?.scheduled);
+                logger.warn("submit.qstash_lock.degraded_scheduled", { id: task.id, firstDelaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS, scheduled: perTaskScheduled, status: (sched as any)?.status });
+              }
+            } catch {
               const sched = await qstashScheduleTaskPoll({ taskId: task.id, attempt: 0, delaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS });
-              logger.warn("submit.qstash_lock.degraded_scheduled", { id: task.id, firstDelaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS, scheduled: (sched as any)?.scheduled === true, status: (sched as any)?.status });
+              perTaskScheduled = Boolean((sched as any)?.scheduled);
+              logger.warn("submit.qstash_lock.error_scheduled", { id: task.id, firstDelaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS, scheduled: perTaskScheduled, status: (sched as any)?.status });
             }
-          } catch {
-            // On any error, prefer scheduling once rather than skipping
+          } else {
             const sched = await qstashScheduleTaskPoll({ taskId: task.id, attempt: 0, delaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS });
-            logger.warn("submit.qstash_lock.error_scheduled", { id: task.id, firstDelaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS, scheduled: (sched as any)?.scheduled === true, status: (sched as any)?.status });
+            perTaskScheduled = Boolean((sched as any)?.scheduled);
+            logger.info("已安排单任务轮询", { taskId: task.id, firstDelaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS, scheduled: perTaskScheduled, status: (sched as any)?.status });
           }
-        } else {
-          const sched = await qstashScheduleTaskPoll({ taskId: task.id, attempt: 0, delaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS });
-          logger.info("已安排单任务轮询", { taskId: task.id, firstDelaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS, scheduled: (sched as any)?.scheduled === true, status: (sched as any)?.status });
+        } catch {
+          try {
+            const sched = await qstashScheduleTaskPoll({ taskId: task.id, attempt: 0, delaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS });
+            perTaskScheduled = Boolean((sched as any)?.scheduled);
+            logger.warn("submit.qstash_lock.catch_scheduled", { id: task.id, scheduled: perTaskScheduled, status: (sched as any)?.status });
+          } catch {}
         }
-      } catch {
-        // Prefer schedule rather than skip on Redis error
+      } else {
+        // 无 Redis：也尝试单任务轮询（不加锁）
         try {
           const sched = await qstashScheduleTaskPoll({ taskId: task.id, attempt: 0, delaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS });
-          logger.warn("submit.qstash_lock.catch_scheduled", { id: task.id, scheduled: (sched as any)?.scheduled === true, status: (sched as any)?.status });
+          perTaskScheduled = Boolean((sched as any)?.scheduled);
+          logger.info("已安排单任务轮询(无Redis)", { taskId: task.id, scheduled: perTaskScheduled, status: (sched as any)?.status });
         } catch {}
       }
-    } else {
-      // 无 Redis 时保留全局轮询兜底（2分钟后触发）
+      // 始终安排一次全局兜底（由 DB 去重），避免单任务调度失败时静默挂起
       try {
         const res = await qstashSchedulePoll(env.TASK_POLL_FIRST_DELAY_SECONDS);
         logger.info("已安排全局轮询兜底", { taskId: task.id, delaySeconds: env.TASK_POLL_FIRST_DELAY_SECONDS, scheduled: (res as any)?.scheduled === true, status: (res as any)?.status });
+      } catch {}
+    } else {
+      // 无 QStash 能力：最佳努力触发一次即时单任务轮询（可能过早，但可见性更好）
+      try {
+        const submitUrl = `${env.NEXT_PUBLIC_SITE_URL}/api/admin/poll/task?task_id=${encodeURIComponent(task.id)}`;
+        const headers: Record<string, string> = {};
+        if (env.ADMIN_SUBMIT_TOKEN) headers["x-internal-submit"] = env.ADMIN_SUBMIT_TOKEN;
+        void fetch(submitUrl, { method: "POST", headers }).catch(() => {});
+        logger.warn("QStash不可用：已触发一次即时轮询", { taskId: task.id });
       } catch {}
     }
     return NextResponse.json({ ok: true, submitted: true, task_id: fpResp?.task_id });

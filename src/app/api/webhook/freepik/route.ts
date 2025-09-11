@@ -16,7 +16,14 @@ export async function POST(req: NextRequest) {
     const cbParam = url.searchParams.get("cb");
     const raw = await req.text();
     const sig = req.headers.get("x-freepik-signature");
-    const body = JSON.parse(raw || "{}");
+    let body: any = {};
+    try {
+      body = raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      // 容错：无效 JSON 直接忽略，避免 500 导致上游重试风暴
+      logger.warn("Webhook解析JSON失败，忽略", { error: String((e as any)?.message || e) });
+      return NextResponse.json({ ok: true, ignored: true, reason: "invalid_json" }, { status: 202 });
+    }
     const fpTaskId: string | undefined = body?.data?.task_id ?? body?.task_id;
     const status: string | undefined = body?.data?.status ?? body?.status;
     const generated: string[] | undefined = body?.data?.generated ?? body?.generated;
