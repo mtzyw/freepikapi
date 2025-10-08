@@ -1,57 +1,39 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Source lives in `src/`:
-  - `src/app/`: Next.js App Router pages and APIs (e.g., `api/task`, `api/webhook/freepik`, `admin/*`).
-  - `src/lib/`: Infrastructure helpers (env, R2, Supabase, QStash, proxy auth).
-  - `src/services/`: Business logic (Freepik dispatcher, finalize, storage).
-  - `src/repo/`: Database access (Supabase queries, schedulers, tasks, keys).
-- Data & migrations: `db/` (raw SQL), `drizzle/` (drizzle‑kit migrations).
-- Static assets: `public/`.
-
-Example paths:
-```
-src/app/api/task/route.ts
-src/services/freepikDispatcher.ts
-src/repo/supabaseRepo.ts
-```
+- `src/` contains runtime code: `src/app/` for App Router pages and APIs (e.g. `src/app/api/task/route.ts`), `src/services/` for Freepik orchestration, `src/lib/` for infrastructure helpers, and `src/repo/` for Supabase data access and schedulers.
+- Data artifacts live in `drizzle/` (drizzle-kit migrations) and `db/` (raw SQL plus seeds); static assets belong in `public/` and temporary uploads stay untracked.
+- Favor reusable modules in services and repos; avoid inline SQL or business logic inside route handlers.
 
 ## Build, Test, and Development Commands
-- `pnpm dev`: Start local dev server at http://localhost:3000.
-- `pnpm build`: Create a production build.
-- `pnpm start`: Serve the built app.
-- `pnpm lint`: Run ESLint checks.
-- `pnpm typecheck`: TypeScript type checks.
-- `pnpm run db:migrate`: Apply migrations in `drizzle/`.
-- `pnpm run db:init`: Apply `db/schema.sql` and seeds.
+- `pnpm dev`: Run the Next.js dev server on http://localhost:3000.
+- `pnpm build`: Create the production bundle; run before releasing changes.
+- `pnpm start`: Serve the latest build for smoke testing.
+- `pnpm lint`: Execute ESLint with the Next.js presets.
+- `pnpm typecheck`: Run TypeScript in `noEmit` mode to catch typing regressions.
+- `pnpm run db:migrate`: Apply pending migrations from `drizzle/`.
+- `pnpm run db:init`: Recreate schema from `db/schema.sql` and load seeds.
 
 ## Coding Style & Naming Conventions
-- Language: TypeScript + React (Next.js 15, App Router).
-- Indentation: 2 spaces; prefer named exports for shared modules.
-- Components: PascalCase; hooks in `useX.ts` files.
-- Routes follow App Router (`page.tsx`, `layout.tsx`, `route.ts`).
-- Styling: Tailwind CSS v4 via `@tailwindcss/postcss`.
-- Linting: ESLint extends `next/core-web-vitals` and `next/typescript`.
+- Code in TypeScript, React, and Tailwind CSS; indent with two spaces and use named exports for shared utilities.
+- Components use PascalCase, hooks live in `useX.ts`, and App Router files stay on the `page.tsx` / `layout.tsx` / `route.ts` pattern.
+- Prefer descriptive domain terms (`freepikTask`, `dispatchJob`) and keep formatting aligned with ESLint (`next/core-web-vitals`, `next/typescript`).
 
 ## Testing Guidelines
-- No framework configured yet. If adding:
-  - Unit: Vitest or Jest; name files `*.test.ts[x]` next to sources.
-  - E2E: Playwright; place specs in `e2e/*.spec.ts`.
-- Keep tests fast, deterministic, and network‑isolated. Add a `test` script and run with `pnpm test`.
+- Test harness is not wired yet; add Vitest or Jest for unit suites (`*.test.ts[x]`) and Playwright for e2e specs (`e2e/*.spec.ts`).
+- Make tests deterministic, avoid external API calls, and wire a `pnpm test` script that runs locally before PR submission.
 
 ## Commit & Pull Request Guidelines
-- Commits: concise, imperative subject (≤72 chars).
-  - Example: `feat(api): add Freepik dispatcher`.
-- PRs: clear description, linked issue (e.g., `Closes #123`), and screenshots for UI changes.
-- Ensure `pnpm build` and `pnpm lint` pass before review.
+- Use imperative subjects under 72 characters (`feat(api): add Freepik dispatcher`).
+- PRs must describe scope, reference tracking issues (`Closes #123`), and include screenshots for visual work.
+- Confirm `pnpm build`, `pnpm lint`, and relevant migrations before requesting review.
 
 ## Security & Configuration Tips
-- Store secrets in env files; never commit real values.
-- Server‑only secrets in `.env.local`; client‑safe via `NEXT_PUBLIC_...`.
-- Prefer DB‑backed token rotation over plaintext tokens.
+- Secrets live in `.env.local`; expose only public values with the `NEXT_PUBLIC_` prefix.
+- Rotate access tokens through Supabase rather than committing static keys.
+- Review `.gitignore` when adding assets to avoid leaking generated files or credentials.
 
 ## Architecture Overview
-- API endpoints in `src/app/api/*`; domain logic in `src/services/*`; DB access in `src/repo/*`.
-- R2 uploads use streaming + multipart; polling may be driven by QStash (`/api/qstash/poll`).
-- Database via drizzle‑kit migrations or raw SQL in `db/`.
-
+- API entry points under `src/app/api/*` call services, which orchestrate repository functions and storage providers.
+- R2 uploads stream through handlers; QStash pollers live at `/api/qstash/poll` and must remain idempotent.
+- Database logic lives in `src/repo/*`; keep queries composable and reuse them across services.
