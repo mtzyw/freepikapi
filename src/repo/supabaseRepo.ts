@@ -18,8 +18,8 @@ async function sha256Hex(input: string): Promise<string> {
   } catch {}
   // Edge/Browser runtime global webcrypto
   try {
-    // @ts-ignore
-    const subtle = (globalThis.crypto && (globalThis.crypto as any).subtle) || null;
+    const maybeGlobal = globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } };
+    const subtle = maybeGlobal.crypto?.subtle ?? null;
     if (subtle) {
       const buf = await subtle.digest("SHA-256", new TextEncoder().encode(input));
       const bytes = new Uint8Array(buf as ArrayBuffer);
@@ -283,7 +283,7 @@ export async function repoFindProxyKeyMetaByToken(tokenCipher: string): Promise<
     if (error) throw error;
     if (!data) return null;
     return data as any;
-  } catch (e) {
+  } catch {
     // Backward compatible: older DBs without default_callback_url/site_id
     const { data, error } = await (supabase as any)
       .from("proxy_keys")

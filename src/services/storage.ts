@@ -1,3 +1,5 @@
+import { randomUUID } from "crypto";
+
 import { r2Enabled, r2HeadObject, r2UploadFromUrl } from "@/lib/r2";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
@@ -8,7 +10,6 @@ export async function storeResultsToR2(taskId: string, urls: string[]) {
   if (!r2Enabled()) return [] as any[];
   const supabase = env.R2_RECORD_ASSETS ? assertSupabase() : null as any;
   const objects: any[] = [];
-  let index = 0;
   for (const url of urls) {
     try {
       const ext = (() => {
@@ -21,8 +22,8 @@ export async function storeResultsToR2(taskId: string, urls: string[]) {
           return "bin";
         }
       })();
-      const key = `tasks/${taskId}/${index}.${ext}`;
-      index += 1;
+      const slug = randomUUID().replace(/-/g, "");
+      const key = `tasks/${taskId}/${slug}.${ext}`;
 
       // Skip if already exists
       const exists = await r2HeadObject(key);

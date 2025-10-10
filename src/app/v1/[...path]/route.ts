@@ -70,34 +70,6 @@ function stripEncodingHeaders(src: Headers): Headers {
   return h;
 }
 
-async function maybeInjectWebhook(bodyText: string, ctx: { callback_url?: string | null } | null): Promise<string> {
-  if (env.PROXY_WEBHOOK_MODE === "off") return bodyText;
-  const baseUrl = baseWebhookUrl();
-  try {
-    const obj = bodyText ? JSON.parse(bodyText) : {};
-    let url = baseUrl;
-    if (env.PROXY_STATELESS && ctx && env.WEBHOOK_TOKEN_SECRET) {
-      const ctxPayload = base64urlEncode(JSON.stringify({ callback_url: ctx.callback_url || null, ts: Date.now() }));
-      const sig = hmacSHA256Hex(env.WEBHOOK_TOKEN_SECRET, ctxPayload);
-      const u = new URL(baseUrl);
-      u.searchParams.set("ctx", ctxPayload);
-      u.searchParams.set("sig", sig);
-      url = u.toString();
-    }
-    if (env.PROXY_WEBHOOK_MODE === "force_override") {
-      obj.webhook_url = url;
-      return JSON.stringify(obj);
-    }
-    if (env.PROXY_WEBHOOK_MODE === "inject_if_missing" && obj.webhook_url == null) {
-      obj.webhook_url = url;
-      return JSON.stringify(obj);
-    }
-    return bodyText;
-  } catch {
-    return bodyText; // non-JSON or invalid JSON; leave as-is
-  }
-}
-
 function inferTypeFromPath(tail: string): "image" | "video" | "edit" {
   const p = tail.toLowerCase();
   if (p.includes("image-to-video") || p.includes("video")) return "video";
@@ -212,28 +184,6 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
 
   // 3) If this looks like a task-creating POST with JSON response, snapshot task and maybe schedule polling
   let out: Response;
-  const ct = upstreamRes.headers.get("content-type") || "";
-  // Best-effort extract task id from headers when body is empty
-  const headerRequestId = (() => {
-    const candidates = [
-      'x-request-id',
-      'request-id',
-      'x-task-id',
-      'task-id',
-      'x-freepik-task-id',
-    ];
-    for (const k of candidates) {
-      const v = upstreamRes.headers.get(k);
-      if (v && v.length > 0) return v;
-    }
-    const loc = upstreamRes.headers.get('location');
-    if (loc) {
-      // try to extract a UUID from the location url
-      const m = loc.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/);
-      if (m) return m[0];
-    }
-    return undefined;
-  })();
   if (method === "POST") {
     const clone = upstreamRes.clone();
     try {

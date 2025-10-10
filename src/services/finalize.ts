@@ -126,6 +126,7 @@ export async function finalizeAndNotifyStateless(params: {
             freepik_task_id: freepikTaskId,
             status,
             public_url: publicUrl,
+            result_payload: resultPayload ?? null,
           }),
           signal: ac.signal,
         }).finally(() => clearTimeout(timer));

@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
 import { env } from "@/lib/env";
-import { Task, TaskPayload, TaskType } from "@/lib/types";
-import { createImageTask, createVideoTask } from "@/services/freepik";
-import { dispatchFreepikTask } from "@/services/freepikDispatcher";
+import { TaskPayload, TaskType } from "@/lib/types";
 import { repoCreateTask, repoUpdateTask } from "@/repo/supabaseRepo";
 import { requireProxyAuth } from "@/lib/proxyAuth";
 import { assertSupabase } from "@/lib/supabase";
 // Note: do not schedule submit via QStash; we only use QStash for polling
 import { finalizeAndNotify } from "@/services/finalize";
-
-function rid() {
-  return Math.random().toString(36).slice(2, 10);
-}
 
 export async function POST(req: NextRequest) {
   let createdId: string | null = null;
