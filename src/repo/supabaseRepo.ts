@@ -34,6 +34,17 @@ function todayISODate() {
   return d.toISOString().slice(0, 10);
 }
 
+type ApiKeyCandidate = { id: string; key_cipher: string; limit: number; used: number };
+type RoundRobinState = { day: string; poolKey: string; index: number };
+
+function getRoundRobinState(): RoundRobinState {
+  const g = globalThis as unknown as { __fpKeyRR?: RoundRobinState };
+  if (!g.__fpKeyRR) {
+    g.__fpKeyRR = { day: "", poolKey: "", index: 0 };
+  }
+  return g.__fpKeyRR;
+}
+
 export async function repoSelectApiKey(): Promise<{ apiKeyId: string; apiKeyCipher: string } | null> {
   const supabase = assertSupabase();
   // Find active keys with usage under limit today, order by used asc
@@ -54,10 +65,24 @@ export async function repoSelectApiKey(): Promise<{ apiKeyId: string; apiKeyCiph
   if (e2) throw e2;
   const usedMap = new Map<string, number>((usage || []).map((u: any) => [u.api_key_id, u.used]));
   const keysTyped = (keys || []) as Array<{ id: string; key_cipher: string; daily_limit?: number }>;
-  const pick = [...keysTyped]
+  const candidates: ApiKeyCandidate[] = [...keysTyped]
     .map((k) => ({ id: k.id, key_cipher: k.key_cipher, limit: k.daily_limit ?? 10000, used: usedMap.get(k.id) ?? 0 }))
-    .sort((a, b) => a.used - b.used)
-    .find((k) => k.used < k.limit) || null;
+    .filter((k) => k.used < k.limit)
+    .sort((a, b) => {
+      if (a.used !== b.used) return a.used - b.used;
+      return a.id.localeCompare(b.id);
+    });
+  if (candidates.length === 0) return null;
+
+  const state = getRoundRobinState();
+  const poolKey = `${day}:${candidates.map((c) => c.id).join("|")}`;
+  if (state.day !== day || state.poolKey !== poolKey) {
+    state.day = day;
+    state.poolKey = poolKey;
+    state.index = 0;
+  }
+  const pick = candidates[state.index % candidates.length];
+  state.index = (state.index + 1) % candidates.length;
   if (!pick) return null;
 
   // Upsert usage +1 (best effort; fine for initial version)
