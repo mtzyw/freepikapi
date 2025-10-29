@@ -5,6 +5,16 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { assertSupabase } from "@/lib/supabase";
 
+function isHttpUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export async function storeResultsToR2(taskId: string, urls: string[]) {
   if (!urls || urls.length === 0) return [] as any[];
   if (!r2Enabled()) return [] as any[];
@@ -12,6 +22,10 @@ export async function storeResultsToR2(taskId: string, urls: string[]) {
   const objects: any[] = [];
   for (const url of urls) {
     try {
+      if (!isHttpUrl(url)) {
+        logger.debug("r2.upload.skip_non_url", { taskId, value: url });
+        continue;
+      }
       const ext = (() => {
         try {
           const u = new URL(url);

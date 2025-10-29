@@ -63,14 +63,17 @@ export async function finalizeAndNotify(params: {
         const ac = new AbortController();
         const timer = setTimeout(() => ac.abort(), Math.max(1000, env.CALLBACK_TIMEOUT_MS));
         const publicUrl = Array.isArray(r2Objects) && r2Objects.length > 0 ? (r2Objects[0]?.public_url || null) : null;
+        const callbackBody: Record<string, any> = {
+          freepik_task_id: task.freepik_task_id,
+          status,
+          public_url: publicUrl,
+        };
+        if (Array.isArray(generated)) callbackBody.generated = generated;
+        if (resultPayload !== undefined) callbackBody.result_payload = resultPayload ?? null;
         await fetch(task.callback_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            freepik_task_id: task.freepik_task_id,
-            status,
-            public_url: publicUrl,
-          }),
+          body: JSON.stringify(callbackBody),
           signal: ac.signal,
         }).finally(() => clearTimeout(timer));
         logger.info("已回调下游", { taskId: task.id, url: task.callback_url });
@@ -119,15 +122,17 @@ export async function finalizeAndNotifyStateless(params: {
         const ac = new AbortController();
         const timer = setTimeout(() => ac.abort(), Math.max(1000, env.CALLBACK_TIMEOUT_MS));
         const publicUrl = Array.isArray(r2Objects) && r2Objects.length > 0 ? (r2Objects[0]?.public_url || null) : null;
+        const callbackBody: Record<string, any> = {
+          freepik_task_id: freepikTaskId,
+          status,
+          public_url: publicUrl,
+        };
+        if (Array.isArray(generated)) callbackBody.generated = generated;
+        callbackBody.result_payload = resultPayload ?? null;
         await fetch(callbackUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            freepik_task_id: freepikTaskId,
-            status,
-            public_url: publicUrl,
-            result_payload: resultPayload ?? null,
-          }),
+          body: JSON.stringify(callbackBody),
           signal: ac.signal,
         }).finally(() => clearTimeout(timer));
         logger.info("已回调下游", { taskId: freepikTaskId, url: callbackUrl });
