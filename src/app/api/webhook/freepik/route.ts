@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
         const cbUrl: string | undefined = ctxJson?.callback_url;
         if (terminalCompleted) {
           logger.info("Webhook判定为完成，进入终态处理", { taskId: fpTaskId });
-          await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "COMPLETED", generated, resultPayload: body });
+          await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "COMPLETED", generated });
         } else if (terminalFailed) {
           logger.info("Webhook判定为失败，进入终态处理", { taskId: fpTaskId });
-          await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "FAILED", generated, resultPayload: body });
+          await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "FAILED", generated });
         }
       } catch (e) {
         logger.warn("webhook.ctx_parse_error", { error: String((e as any)?.message || e) });
@@ -82,10 +82,10 @@ export async function POST(req: NextRequest) {
             const cbUrl = buf.toString("utf-8");
             if (terminalCompleted) {
               logger.info("Webhook判定为完成，进入终态处理", { taskId: fpTaskId });
-              await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "COMPLETED", generated, resultPayload: body });
+              await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "COMPLETED", generated });
             } else if (terminalFailed) {
               logger.info("Webhook判定为失败，进入终态处理", { taskId: fpTaskId });
-              await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "FAILED", generated, resultPayload: body });
+              await finalizeAndNotifyStateless({ freepikTaskId: fpTaskId, callbackUrl: cbUrl, status: "FAILED", generated });
             }
             return NextResponse.json({ ok: true });
           } catch {

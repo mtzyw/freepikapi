@@ -69,7 +69,6 @@ export async function finalizeAndNotify(params: {
           public_url: publicUrl,
         };
         if (Array.isArray(generated)) callbackBody.generated = generated;
-        if (resultPayload !== undefined) callbackBody.result_payload = resultPayload ?? null;
         await fetch(task.callback_url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -97,9 +96,8 @@ export async function finalizeAndNotifyStateless(params: {
   callbackUrl: string | null | undefined;
   status: "COMPLETED" | "FAILED";
   generated?: string[];
-  resultPayload?: any;
 }) {
-  const { freepikTaskId, callbackUrl, status, generated, resultPayload } = params;
+  const { freepikTaskId, callbackUrl, status, generated } = params;
   const lockKey = `completion_lock:fp:${freepikTaskId}`;
   const ttlMs = Math.max(30_000, env.FINALIZE_LOCK_TTL_SECONDS * 1000);
   logger.info("开始终态处理", { taskId: freepikTaskId, status, genCount: Array.isArray(generated) ? generated.length : 0 });
@@ -128,7 +126,6 @@ export async function finalizeAndNotifyStateless(params: {
           public_url: publicUrl,
         };
         if (Array.isArray(generated)) callbackBody.generated = generated;
-        callbackBody.result_payload = resultPayload ?? null;
         await fetch(callbackUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
