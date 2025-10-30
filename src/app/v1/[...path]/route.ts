@@ -7,16 +7,6 @@ import { base64urlEncode, hmacSHA256Hex } from "@/lib/sign";
 
 export const runtime = "nodejs";
 
-let rrIndex = 0;
-function pickUpstreamKeyFromEnv(): { apiKeyCipher: string; apiKeyId: string } | null {
-  const keys = env.FREEPIK_API_KEYS;
-  if (!keys || keys.length === 0) return null;
-  const idx = rrIndex++ % keys.length;
-  const key = keys[idx];
-  // synthesize an id using index; only used for logging
-  return { apiKeyCipher: key, apiKeyId: `env:${idx}` };
-}
-
 function baseWebhookUrl(): string {
   const cfg = env.WEBHOOK_URL?.trim();
   if (!cfg) return `${env.NEXT_PUBLIC_SITE_URL}/api/webhook/freepik`;
@@ -132,9 +122,8 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     return NextResponse.json({ error: "invalid_proxy_key" }, { status: 403 });
   }
 
-  // 2) Pick upstream Freepik API key
-  let pick = pickUpstreamKeyFromEnv();
-  if (!pick) pick = await repoSelectApiKey();
+  // 2) Pick upstream Freepik API key（必须存在于数据库，确保配额统计一致）
+  const pick = await repoSelectApiKey();
   if (!pick?.apiKeyCipher || !pick?.apiKeyId) {
     return NextResponse.json({ error: "no_upstream_key" }, { status: 503 });
   }
