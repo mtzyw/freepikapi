@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Receiver } from "@upstash/qstash";
 import { logger } from "@/lib/logger";
 import { redisAvailable, redisSetNX, redisDel } from "@/lib/redis";
-import { repoGetApiKeyCipherById, repoGetTaskBasicById, repoGetTaskForSubmit, repoUpdateTask } from "@/repo/supabaseRepo";
+import { repoGetApiKeyCipherById, repoGetTaskBasicById, repoGetTaskForSubmit } from "@/repo/supabaseRepo";
 import { getStatusForModel } from "@/services/freepikDispatcher";
 import { finalizeAndNotify } from "@/services/finalize";
 import { qstashScheduleTaskPoll } from "@/lib/qstash";
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
           if (!res.ok) throw new Error(`Freepik GET ${entry} failed: ${res.status}`);
           const data = await res.json();
           s = { status: data?.data?.status ?? data?.status, generated: data?.data?.generated ?? data?.generated };
-        } catch (e) {
+        } catch {
           // keep s as null; will go to retry branch below
           s = s || { status: undefined, generated: undefined };
         }

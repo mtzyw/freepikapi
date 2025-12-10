@@ -3,7 +3,7 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { repoCreateTask, repoFindProxyKeyMetaByToken, repoGetModelByRequestEndpoint, repoSelectApiKey } from "@/repo/supabaseRepo";
 import { qstashScheduleTaskPoll } from "@/lib/qstash";
-import { base64urlEncode, hmacSHA256Hex } from "@/lib/sign";
+import { base64urlEncode } from "@/lib/sign";
 
 export const runtime = "nodejs";
 

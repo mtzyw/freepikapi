@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { Receiver } from "@upstash/qstash";
 import { getStatusForModel } from "@/services/freepikDispatcher";
-import { repoGetApiKeyCipherById, repoGetTaskBasicById, repoListInProgressTasks, repoUpdateTask } from "@/repo/supabaseRepo";
+import { repoGetApiKeyCipherById, repoGetTaskBasicById, repoListInProgressTasks } from "@/repo/supabaseRepo";
 import { finalizeAndNotify } from "@/services/finalize";
 import { qstashSchedulePoll } from "@/lib/qstash";
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         await finalizeAndNotify({ task, status: "FAILED", generated: [], resultPayload: { reason: "upstream_failed" } });
       }
       results.push({ id: t.id, status: s.status });
-    } catch (e) {
+    } catch {
       results.push({ id: t.id, status: "ERROR" });
     }
   }

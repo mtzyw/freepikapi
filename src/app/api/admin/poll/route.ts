@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStatusForModel } from "@/services/freepikDispatcher";
 import { env } from "@/lib/env";
-import { repoGetApiKeyCipherById, repoGetTaskBasicById, repoListInProgressTasks, repoUpdateTask } from "@/repo/supabaseRepo";
+import { repoGetApiKeyCipherById, repoGetTaskBasicById, repoListInProgressTasks } from "@/repo/supabaseRepo";
 import { finalizeAndNotify } from "@/services/finalize";
 
 export const runtime = "nodejs";
@@ -39,7 +39,7 @@ export async function GET() {
         await finalizeAndNotify({ task, status: "FAILED", generated: [], resultPayload: { reason: "upstream_failed" } });
       }
       results.push({ id: t.id, status: s.status });
-    } catch (e) {
+    } catch {
       results.push({ id: t.id, status: "ERROR" });
     }
   }

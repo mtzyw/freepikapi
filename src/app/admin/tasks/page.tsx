@@ -10,6 +10,21 @@ async function listTasks() {
   return data || [];
 }
 
+function formatDate(value: string | null | undefined) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).format(d);
+}
+
 export default async function TasksPage() {
   const rows = await listTasks();
   return (
@@ -29,15 +44,21 @@ export default async function TasksPage() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((t: any) => (
+            {rows.length === 0 ? (
+              <tr><td className="p-3 text-center text-gray-500" colSpan={7}>暂无任务</td></tr>
+            ) : rows.map((t: any) => (
               <tr key={t.id} className="border-t">
                 <td className="p-2 font-mono">{t.id}</td>
-                <td className="p-2">{t.status}</td>
+                <td className="p-2">
+                  <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium">
+                    {t.status}
+                  </span>
+                </td>
                 <td className="p-2">{t.model || '-'}</td>
                 <td className="p-2 font-mono">{t.freepik_task_id || '-'}</td>
-                <td className="p-2">{t.created_at}</td>
-                <td className="p-2">{t.started_at || '-'}</td>
-                <td className="p-2">{t.completed_at || '-'}</td>
+                <td className="p-2">{formatDate(t.created_at)}</td>
+                <td className="p-2">{formatDate(t.started_at)}</td>
+                <td className="p-2">{formatDate(t.completed_at)}</td>
               </tr>
             ))}
           </tbody>
@@ -47,4 +68,3 @@ export default async function TasksPage() {
     </div>
   );
 }
-
